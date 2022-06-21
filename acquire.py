@@ -1,5 +1,6 @@
 import requests
 import pandas as pd
+import os
 
 def get_items(resource):
     """Returns a list of dfs for each page that the api has
@@ -93,13 +94,47 @@ def resource_dfs_to_csv(resource_df_dict):
     for key, value in resource_df_dict.items():
         value.to_csv(f'{key}.csv')
 
-if __name__ == '__main__':
+    sales = resource_df_dict['sales']
+    stores = resource_df_dict['stores']
+    items = resource_df_dict['items']
+
+    total = sales.merge(right=items, how='left', left_on='item', right_on='item_id' )
+    total = sales.merge(right=stores, how='left', left_on='store', right_on='store_id')
+
+    total.to_csv('total_df.csv')
+
+    return total
+
+
+def ignore_first(df):
+    '''Ignores first 'Unnamed: 0' column when reading csv'''
+    return df[df.columns[1:]]
+        
+def load_all_data():
+    """return all three csvs
+    returns sales, stores, items"""
+    sales = ignore_first(pd.read_csv('sales.csv'))
+    stores = ignore_first(pd.read_csv('stores.csv'))
+    items = ignore_first(pd.read_csv('items.csv'))
+
+    return sales, stores, items
+
+def acquire_open_power_systems_data():
+    url = 'https://raw.githubusercontent.com/jenfly/opsd/master/opsd_germany_daily.csv'
+    return pd.read_csv(url)
+
+def acquire_sales_stores_items_data():
     # list of all resources to make dfs out of 
     list_of_resources = ['items', 'stores', 'sales']
+    filename = 'total_df.csv'
+
+    if os.path.isfile(filename):
+        return ignore_first(pd.read_csv(filename))
+    else:
+        # create resource_dict to then be written to csv
+        resource_dict = all_resource_dfs(list_of_resources)
+        return resource_dfs_to_csv(resource_dict)
     
-    # create resource_dict to then be written to csv
-    resource_dict = all_resource_dfs(list_of_resources)
-    resource_dfs_to_csv(resource_dict)
 
     
 
