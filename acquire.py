@@ -120,8 +120,18 @@ def load_all_data():
     return sales, stores, items
 
 def acquire_open_power_systems_data():
-    url = 'https://raw.githubusercontent.com/jenfly/opsd/master/opsd_germany_daily.csv'
-    return pd.read_csv(url)
+    """ uses url to grab csv for open power systems if csv
+    does not already exist"""
+    filename = 'open_pwr_sys_data.csv'
+
+    if os.path.isfile(filename):
+        return ignore_first(pd.read_csv(filename))
+    else:
+        url = 'https://raw.githubusercontent.com/jenfly/opsd/master/opsd_germany_daily.csv'
+        data = pd.read_csv(url)
+        data.to_csv(filename)
+    
+        return data
 
 def acquire_sales_stores_items_data():
     # list of all resources to make dfs out of 
