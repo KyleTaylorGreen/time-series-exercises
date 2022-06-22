@@ -1,6 +1,32 @@
+import sys
 import requests
 import pandas as pd
 import os
+import asyncio
+from aiohttp import ClientSession
+from aiohttp import TCPConnector
+import timeit
+import time
+import sys
+import json
+import httpx
+
+
+def all_urls():
+
+    base_url  = 'https://python.zgulde.net/'
+
+    resources = ['items', 'sales', 'stores']
+    urls_dict = []
+
+    for resource in resources:
+        max_page = requests.get(base_url + f'api/v1/{resource}').json()['payload']['max_page']
+        
+        for page in range(1, max_page+1):
+            url_endpoint = f'/api/v1/{resource}?page={page}'
+            urls_dict.append(base_url + url_endpoint)
+
+    return urls_dict
 
 def get_items(resource):
     """Returns a list of dfs for each page that the api has
@@ -21,10 +47,7 @@ def get_items(resource):
     max_pages = response.json()['payload']['max_page']
     
     # loop for the amount of pages available
-    for x in range(1, max_pages+1):
-        
-        # just easier to read when making the endpoint url
-        page=x
+    for page in range(1, max_pages+1):
         
         # create a generic url_endpoint that can be used with page
         # number and resource type
@@ -32,7 +55,7 @@ def get_items(resource):
         response = requests.get(base_url + url_endpoint)
         
         # show what page we're on, and whether the response was ok
-        print(f'page {x}, response ok: {response.ok}')
+        print(f'page {page}, response ok: {response.ok}')
         
         # append the df to a list of all dfs for this resource, 
         # to be concatenated later.
@@ -105,7 +128,6 @@ def resource_dfs_to_csv(resource_df_dict):
 
     return total
 
-
 def ignore_first(df):
     '''Ignores first 'Unnamed: 0' column when reading csv'''
     return df[df.columns[1:]]
@@ -133,6 +155,8 @@ def acquire_open_power_systems_data():
     
         return data
 
+
+
 def acquire_sales_stores_items_data():
     # list of all resources to make dfs out of 
     list_of_resources = ['items', 'stores', 'sales']
@@ -144,8 +168,4 @@ def acquire_sales_stores_items_data():
         # create resource_dict to then be written to csv
         resource_dict = all_resource_dfs(list_of_resources)
         return resource_dfs_to_csv(resource_dict)
-    
-
-    
-
     
