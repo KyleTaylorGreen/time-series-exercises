@@ -39,8 +39,8 @@ async def main(url_list):
 # creates list of urls + index and sends them to asynchronous
 # main function
 
-def request_all_urls_comparison():
-    urls = [[i, url] for i, url in enumerate(acquire.all_urls())]
+def request_all_urls_comparison(urls):
+    urls = urls
 
     #urls = [[i, 'http://serebii.net'] for i in range(150)]
     start = time.perf_counter()
@@ -51,21 +51,23 @@ def request_all_urls_comparison():
     # get end time of async function
     # start time of sync function
     async_end = time.perf_counter() - start
-    sync_start = time.perf_counter()
+    #sync_start = time.perf_counter()
     
     # start sync function
     # calculate time to complete sync function
-    sequential = acquire.all_resource_dfs(['items', 'sales', 'stores'])
-    sync_end = time.perf_counter() - sync_start
+    #sequential = acquire.all_resource_dfs(['items', 'sales', 'stores'])
+    #sync_end = time.perf_counter() - sync_start
 
     # display the times for each
     print(f"Async time to complete: {async_end}")
-    print(f'synchronous time to end: {sync_end}')
+    #print(f'synchronous time to end: {sync_end}')
 
 
 if __name__ == '__main__':
-    request_all_urls_comparison()
+    urls = [[i, url] for i, url in enumerate(acquire.all_urls())]
+    request_all_urls_comparison(urls)
 
     # first results
     # async: ~140 seconds
     # sync: ~220 seconds
+

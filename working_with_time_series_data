@@ -1,2 +1,2 @@
 from vega_datasets import data
-data.sf_temps()
+temps = data.sf_temps()
