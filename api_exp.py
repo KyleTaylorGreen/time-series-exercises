@@ -1,17 +1,59 @@
 import env
-import requests
 import time
 import datetime
+import pandas as pd
+import cassiopeia
 
 
-riot_api_key = env.riot_api_key
+# see https://github.com/psf/requests/issues/1595#issuecomment-504030697 for more details
+import requests
+import ujson
+
+requests.models.complexjson = ujson
+
+
+
+RIOT_API_KEY = env.RIOT_API_KEY
 my_puuid = 'YUYpGhggndqqGjTbJf_vfCO8r6pEwepm8PTLobOkX9dFVKV5B5QDGhrElvukJfSwSCw4d_4ipPKpFA'
-
 base_url = 'https://americas.api.riotgames.com'
 # solo ranked summoner's rift 5v5
 queue_id = 420
-
-
+settings= {"RiotAPI": {
+                      "api_key": "RIOT_API_KEY",
+                      "limiting_share": 1.0,
+                      "request_error_handling": {
+        "404": {
+            "strategy": "throw"
+        },
+        "429": {
+            "service": {
+                "strategy": "exponential_backoff",
+                "initial_backoff": 1.0,
+                "backoff_factor": 2.0,
+                "max_attempts": 4
+            },
+            "method": {
+                "strategy": "retry_from_headers",
+                "max_attempts": 5
+            },
+            "application": {
+                "strategy": "retry_from_headers",
+                "max_attempts": 5
+            }
+      },
+      "500": {
+          "strategy": "throw"
+      },
+      "503": {
+          "strategy": "throw"
+      },
+      "timeout": {
+          "strategy": "throw"
+      }
+    }
+}
+}
+cassiopeia.apply_settings(settings)
 urls= []
 
 def get_match_history(puuid):
@@ -36,7 +78,10 @@ def get_match_data_from(match):
 
 
 class Match:
+    all_matches = {}
+
     def __init__(self,matchid):
+        self.player_stats = pd.DataFrame()
         
         self.matchid = matchid
         self.match_data = get_match_data_from(matchid)
@@ -56,11 +101,55 @@ class Match:
         self.red_won = not self.blue_won
 
         self.players = {}
+        self.game_history_dict = {}
+        self.puuid_to_summoner = {}
         for puuid in self.puuids:
-            self.players[puuid] = PlayerAtTimeOfGame(puuid, self).games_before_match
+            time.sleep(1.25)
+            summoner = requests.get(f'https://na1.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/{puuid}', headers=env.headers).json()
+            if PlayerAtTimeOfGame(puuid, self).games_before_match:
+                previous_game_id = PlayerAtTimeOfGame(puuid, self).games_before_match
+                print(previous_game_id)
+            else:
+                previous_game_id = [0]
+
+            if previous_game_id[0]:
+                last_game_data = get_match_data_from(previous_game_id[0])
+                last_game_finish = last_game_data[previous_game_id[0]]['info']['gameEndTimestamp']
+                last_100_games = PlayerAtTimeOfGame(puuid, self).get_games_before_current_game()
+            else:
+                last_game_finish = 0
+                last_100_games = [0]
+
+            
+            for participant in self.match_data[self.matchid]['info']['participants']:
+                if participant['puuid'] == puuid:
+                    win = participant['win']
+                    champ = participant['championName']
+                    champ_id = participant['championId']
+                    team_pos = participant['teamPosition']
+            self.game_history_dict[puuid] = last_100_games
+            self.puuid_to_summoner[puuid] = summoner['name']
+            self.players[puuid] = {'puu_id': puuid,
+                                   'match_id': self.matchid,
+                                   'previous_game_id': previous_game_id[0],
+                                   'account_id' : summoner['accountId'],
+                                   'summonerName': summoner['name'],
+                                   'id': summoner['id'],
+                                   'game_creation_time': self.creation,
+                                   'game_start': self.start_u,
+                                   'game_finish': self.stop_u,
+                                   'game_duration': self.game_duration_dt,
+                                   'win': win,
+                                   'champ_name': champ,
+                                   'champ_id': champ_id,
+                                   'team_pos': team_pos,
+                                   'time_since_last_game': (self.start_u-last_game_finish) / 1000 / 60,
+                                   'last_100_games': last_100_games
+                                   }
         
-
-
+        self.player_stats = pd.DataFrame(self.players.values())
+        self.all_matches[self.matchid] = self.player_stats
+            
     def get_participants(self):
         #print(self.match_data)
         participants = []
@@ -106,25 +195,26 @@ class PlayerAtTimeOfGame:
         self.match_data = match.match_data
         self.matchid = match.matchid
         self.creation = int(self.match_data[match.matchid]['info']['gameCreation'] / 1000)
-        self.games_before_match = self.get_games_before_current_game()
+        self.games_before_match = self.most_recent_game()
 
-    def get_games_before_current_game(self):
+    def get_games_before_current_game(self, count=100):
         limiting_time = self.creation - 1
-        response = requests.get(f'https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{self.puuid}/ids?endTime={limiting_time}&queue=420&start=0&count=100', headers=env.headers).json()
+        response = requests.get(f'https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{self.puuid}/ids?endTime={limiting_time}&queue=420&start=0&count={count}', headers=env.headers).json()
 
         return response
 
+    def most_recent_game(self, count=1):
+        return self.get_games_before_current_game(count=count)
 
-if __name__ == '__main__':
+def main(basic_match_id):
+    match_info = Match(basic_match_id)
+
+    return match_info
+
+#if __name__ == '__main__':
     basic_match_id = 'NA1_4169229565'
     NA1_4169229565 = Match(basic_match_id)
-    print(NA1_4169229565.participants)
-    print(NA1_4169229565.game_duration_dt)   
-    print(NA1_4169229565.blue_team) 
-    print(NA1_4169229565.start_u)
-    print(NA1_4169229565.players)
-
-
+    
     
     
 #class Player:
