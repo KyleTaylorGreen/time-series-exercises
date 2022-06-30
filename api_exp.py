@@ -104,7 +104,7 @@ class Match:
         self.game_history_dict = {}
         self.puuid_to_summoner = {}
         for puuid in self.puuids:
-            time.sleep(1.25)
+            time.sleep(1)
             summoner = requests.get(f'https://na1.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/{puuid}', headers=env.headers).json()
             if PlayerAtTimeOfGame(puuid, self).games_before_match:
                 previous_game_id = PlayerAtTimeOfGame(puuid, self).games_before_match
@@ -114,13 +114,15 @@ class Match:
 
             if previous_game_id[0]:
                 last_game_data = get_match_data_from(previous_game_id[0])
-                last_game_finish = last_game_data[previous_game_id[0]]['info']['gameEndTimestamp']
+                try:
+                    last_game_finish = last_game_data[previous_game_id[0]]['info']['gameEndTimestamp']
+                except: 
+                    last_game_finish = 0
                 last_100_games = PlayerAtTimeOfGame(puuid, self).get_games_before_current_game()
             else:
                 last_game_finish = 0
                 last_100_games = [0]
 
-            
             for participant in self.match_data[self.matchid]['info']['participants']:
                 if participant['puuid'] == puuid:
                     win = participant['win']
@@ -174,7 +176,10 @@ class Match:
 
     def get_game_time(self):
         start = self.match_data[self.matchid]['info']['gameStartTimestamp']
-        finish = self.match_data[self.matchid]['info']['gameEndTimestamp']
+        try:
+            finish = self.match_data[self.matchid]['info']['gameEndTimestamp']
+        except:
+            finish = 0
         creation = self.match_data[self.matchid]['info']['gameCreation'] / 1000
 
         return start, finish, creation
