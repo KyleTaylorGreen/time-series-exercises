@@ -86,15 +86,11 @@ class Match:
         self.matchid = matchid
         self.match_data = get_match_data_from(matchid)
         self.participants = self.get_participants()
-        self.start_u, self.stop_u, self.creation = self.get_game_time()
+        self.start_u, self.game_duration, self.creation = self.get_game_time()
 
         self.puuids = self.match_data[self.matchid]['metadata']['participants']
 
         self.start_dt = datetime.datetime.fromtimestamp(self.start_u/1000)
-        self.stop_dt = datetime.datetime.fromtimestamp(self.stop_u/1000)
-
-        self.game_duration_u = self.stop_u - self.start_u
-        self.game_duration_dt = self.stop_dt - self.start_dt
 
         self.blue_team, self.red_team = self.get_teams()
         self.blue_won = self.get_team_win()
@@ -115,7 +111,14 @@ class Match:
             if previous_game_id[0]:
                 last_game_data = get_match_data_from(previous_game_id[0])
                 try:
-                    last_game_finish = last_game_data[previous_game_id[0]]['info']['gameEndTimestamp']
+                    if last_game_data[previous_game_id[0]]['info']['gameDuration'] / 10_000 > 1:
+                        duration = last_game_data[previous_game_id[0]]['info']['gameDuration'] / 1000
+                        print(f'game duration: {duration/60}')
+                    else:
+                        duration = last_game_data[previous_game_id[0]]['info']['gameDuration']
+                        print(f'game duration: {duration/60}')
+
+                    last_game_finish = last_game_data[previous_game_id[0]]['info']['gameStartTimestamp']/1000 + duration
                 except: 
                     last_game_finish = 0
                 last_100_games = PlayerAtTimeOfGame(puuid, self).get_games_before_current_game()
@@ -139,16 +142,19 @@ class Match:
                                    'id': summoner['id'],
                                    'game_creation_time': self.creation,
                                    'game_start': self.start_u,
-                                   'game_finish': self.stop_u,
-                                   'game_duration': self.game_duration_dt,
+                                   'game_finish': self.start_u + self.game_duration,
+                                   'game_duration': self.game_duration,
                                    'win': win,
                                    'champ_name': champ,
                                    'champ_id': champ_id,
                                    'team_pos': team_pos,
-                                   'time_since_last_game': (self.start_u-last_game_finish) / 1000 / 60,
+                                   'time_since_last_game': (self.start_u - last_game_finish)/60,
                                    'last_100_games': last_100_games
                                    }
         
+            print(f'last game finish: {last_game_finish}')
+            print(f'current game start {self.start_u}')
+            print(f'time since last game {(self.start_u - last_game_finish) / 60}')
         self.player_stats = pd.DataFrame(self.players.values())
         self.all_matches[self.matchid] = self.player_stats
             
@@ -175,17 +181,18 @@ class Match:
     
 
     def get_game_time(self):
-        start = self.match_data[self.matchid]['info']['gameStartTimestamp']
+        start = self.match_data[self.matchid]['info']['gameStartTimestamp']/1000
         try:
-            finish = self.match_data[self.matchid]['info']['gameEndTimestamp']
+            duration = self.match_data[self.matchid]['info']['gameDuration']
         except:
-            finish = 0
-        creation = self.match_data[self.matchid]['info']['gameCreation'] / 1000
+            duration = 0
+        if duration / 10_000 > 1:
+            duration/=1000
+        creation = self.match_data[self.matchid]['info']['gameCreation'] /1000
 
-        return start, finish, creation
+        return start, duration, creation
 
     def get_team_win(self):
-
         for team in self.match_data[self.matchid]['info']['participants']:
             if team['teamId'] == 100:
                 if team['win'] == True:
@@ -199,11 +206,12 @@ class PlayerAtTimeOfGame:
         self.puuid = puuid
         self.match_data = match.match_data
         self.matchid = match.matchid
-        self.creation = int(self.match_data[match.matchid]['info']['gameCreation'] / 1000)
+        self.creation = self.match_data[match.matchid]['info']['gameCreation']
         self.games_before_match = self.most_recent_game()
 
     def get_games_before_current_game(self, count=100):
-        limiting_time = self.creation - 1
+        limiting_time = int(self.creation/1000) - 1
+        print(f'CREATION TIME!!!: {self.creation/1000}')
         response = requests.get(f'https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{self.puuid}/ids?endTime={limiting_time}&queue=420&start=0&count={count}', headers=env.headers).json()
 
         return response

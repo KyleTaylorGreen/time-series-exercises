@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import numpy as np
 import datetime
 
 my_path = '/Users/kylegreen/codeup-data-science/time-series-exercises/riot_api_data/'
@@ -31,8 +32,8 @@ def drop_duplicates():
 def read_stats(filename):
     return pd.read_csv(filename)
 
-def time_columns():
-    stats = read_stats('/Users/kylegreen/codeup-data-science/time-series-exercises/riot_api_data/NA1_4169245913_histories.csv')
+def time_columns(filename):
+    stats = read_stats(f'/Users/kylegreen/codeup-data-science/time-series-exercises/riot_api_data/{filename}')
     columns= [col for col in stats.columns]
     #stats.game_end = stats.game_end.fillna(0)
     print(stats.game_end)
@@ -55,24 +56,66 @@ def time_columns():
     columns.append('time_between_games')
 
     def make_session_counts(df):
-        truth_counter= 0
+        truth_counter= 1
         session_series = []
+        session_cnt = 0
+        sessions = [[]]
+        wins_losses = []
+        copy= [[]]
+
+        win_counter = 0
+        loss_counter = 0
+        num_of_wins_in_session = 1
         
-        for x in df.is_session:
-
+        for i, x in enumerate(df.is_session):
             if x == True:
+                if df.win.iloc[i]:
+                    win_counter +=1
+                else:
+                    loss_counter +=1
                 truth_counter += 1
+                sessions[session_cnt].append(i)
             else:
-                for i in range(truth_counter, -1, -1):
-                    session_series.append(i)
-                truth_counter = 0
+                for k in range(truth_counter, 0, -1):
+                    session_series.append(k)
+                
+                truth_counter = 1
+                sessions[session_cnt].append(i)
+                sessions.append([])
+                session_cnt+=1
 
-        return session_series
-    
+        copy = sessions[:][:]
+        counter = 0
+        for l, session in enumerate(sessions):
+            copy[l] = np.array(copy[l])
+
+            for k, game in enumerate(session):
+                print(counter)
+                print(df.win.iloc[counter])
+                if df.win.iloc[counter]:
+                    copy[l][k] = 1
+                else:
+                    copy[l][k] = 0
+                counter+=1
+            copy[l] = np.flip(copy[l])
+            copy[l] = np.cumsum(copy[l])
+            copy[l] = np.flip(copy[l])
+
+        copy = copy[:-1]
+        final_wins = [elem for elements in copy for elem in elements]
+        #print(final_wins)
+        #print(session_series)
+        print(len(final_wins))
+
+        return session_series, final_wins
+
     total_df = stats[columns]
+    total_df = total_df.reset_index()
 
-    session = make_session_counts(total_df)
-    total_df['session_count'] = [num+1 for num in session]
+    our_session, final_wins = make_session_counts(total_df)
+    print(len(our_session))
+    total_df['session_count'] = our_session
+    total_df['session_wins']  = final_wins
+    total_df['session_losses']= total_df.session_count - total_df.session_wins
 
-    
     return total_df
