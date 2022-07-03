@@ -113,10 +113,8 @@ class Match:
                 try:
                     if last_game_data[previous_game_id[0]]['info']['gameDuration'] / 10_000 > 1:
                         duration = last_game_data[previous_game_id[0]]['info']['gameDuration'] / 1000
-                        print(f'game duration: {duration/60}')
                     else:
                         duration = last_game_data[previous_game_id[0]]['info']['gameDuration']
-                        print(f'game duration: {duration/60}')
 
                     last_game_finish = last_game_data[previous_game_id[0]]['info']['gameStartTimestamp']/1000 + duration
                 except: 
@@ -142,7 +140,7 @@ class Match:
                                    'id': summoner['id'],
                                    'game_creation_time': self.creation,
                                    'game_start': self.start_u,
-                                   'game_finish': self.start_u + self.game_duration,
+                                   'game_finish': self.start_u + (self.game_duration * 1000),
                                    'game_duration': self.game_duration,
                                    'win': win,
                                    'champ_name': champ,
@@ -152,9 +150,7 @@ class Match:
                                    'last_100_games': last_100_games
                                    }
         
-            print(f'last game finish: {last_game_finish}')
-            print(f'current game start {self.start_u}')
-            print(f'time since last game {(self.start_u - last_game_finish) / 60}')
+            
         self.player_stats = pd.DataFrame(self.players.values())
         self.all_matches[self.matchid] = self.player_stats
             

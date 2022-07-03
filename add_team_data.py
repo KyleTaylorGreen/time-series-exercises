@@ -25,5 +25,5 @@ def add_teams():
 
             lobby_df.to_csv(my_path+filename, index=False)
 
-            print(lobby_df)
-    print(sum/count)
+            
+    
